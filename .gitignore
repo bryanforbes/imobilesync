@@ -1,2 +1,6 @@
 .*.swp
 *.pyc
+bin
+lib
+include
+imobilesync.egg-info
