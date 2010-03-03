@@ -1,0 +1,18 @@
+About
+=====
+A package to provide synchronization capabilities for iDevices.  Comes with an optional Conduit module.
+
+Requirements
+============
+python-imobiledevice
+python-vobject
+conduit (optional)
+
+Installation
+============
+
+The easy way:
+sudo python setup.py install
+
+For developers (virtualenv):
+python bootstrap.py

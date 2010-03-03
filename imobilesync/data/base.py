@@ -1,5 +1,6 @@
 from imobilesync.plist_util import create_array, EMPTY_PARAM
 from imobilesync.sync import SyncErrorCancel
+from imobilesync.config import state
 
 from plist import PLIST_STRING, PLIST_DICT, PLIST_ARRAY, PLIST_NONE, PLIST_DATA, PLIST_DATE, PLIST_UINT
 from datetime import timedelta
@@ -17,7 +18,8 @@ class Base(object):
 
     related_classes = ()
 
-    def __init__(self, record_id, record_dict):
+    def __init__(self, uuid, record_id, record_dict):
+        self._uuid = uuid
         self.__record_id = record_id
         self.__record_dict = record_dict
 
@@ -52,6 +54,10 @@ class Base(object):
         return self.__record_id
     id = property(__get_record_id)
 
+    def __get_unique_id(self):
+        return '%s@iphone-%s' % (self.__record_id, self._uuid)
+    uuid = property(__get_unique_id)
+
     def __get_record_dict(self):
         return self.__record_dict
     record_dict = property(__get_record_dict)
@@ -76,6 +82,18 @@ class BaseList(object):
 
     related_schema_classes = ()
 
+    config = None
+    state = None
+
+    def __init__(self, uuid, mobile_sync):
+        self._uuid = uuid
+        self._mobile_sync = mobile_sync
+        self._parent_records = {}
+
+        self.__related_class_map = {}
+        for cls in self.parent_schema_class.related_classes:
+            self.__related_class_map[cls.entity_name] = cls
+
     @classmethod
     def sync_message(cls, last_sync_time, version):
         return create_array(
@@ -95,17 +113,9 @@ class BaseList(object):
         )
 
     @staticmethod
-    def serialize(uuid, records):
-        output = [record.serialize(uuid) for record in records]
+    def serialize(records):
+        output = [record.serialize() for record in records]
         return ''.join(output)
-
-    def __init__(self, mobile_sync):
-        self._mobile_sync = mobile_sync
-        self._parent_records = {}
-
-        self.__related_class_map = {}
-        for cls in self.parent_schema_class.related_classes:
-            self.__related_class_map[cls.entity_name] = cls
 
     def all(self):
         msg = create_array(
@@ -158,10 +168,10 @@ class BaseList(object):
 
     def _process_record(self, entity_name, id, record):
         if entity_name == self.parent_schema_class.entity_name:
-            self._parent_records[id] = self.parent_schema_class(id, record)
+            self._parent_records[id] = self.parent_schema_class(self._uuid, id, record)
         elif entity_name in self.__related_class_map:
             cls = self.__related_class_map[entity_name]
-            obj = cls(id, record)
+            obj = cls(self._uuid, id, record)
 
             self._process_related_record(obj)
 

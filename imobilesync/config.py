@@ -15,6 +15,14 @@ config_directory = path(os.environ.get('XDG_CONFIG_HOME',
 class Bunch(dict):
     """A dictionary that provides attribute-style access."""
 
+    def add(self, section, defaults=None):
+        if not hasattr(self, section):
+            if defaults is not None:
+                setattr(self, section, Bunch(**defaults))
+            else:
+                setattr(self, section, Bunch())
+        return getattr(self, section)
+
     def __repr__(self):
         keys = self.keys()
         keys.sort()
@@ -85,16 +93,6 @@ class Config(Bunch):
 
 class State(Bunch):
     state_file = config_directory / 'state.pickle'
-
-    def __init__(self, *args, **kwargs):
-        super(State, self).__init__(*args, **kwargs)
-
-        self.contacts = Bunch(
-            last_sync_time=None
-        )
-        self.calendars = Bunch(
-            last_sync_time=None
-        )
 
     def write(self):
         if not config_directory.exists():

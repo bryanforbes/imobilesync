@@ -1,5 +1,7 @@
 from imobilesync.data.base import BaseList, Base, RelatedBase
-from imobilesync.config import state
+from imobilesync.config import state, config
+from imobilesync.options import parser
+
 import vobject, datetime
 
 __all__ = ['Calendar', 'Calendars']
@@ -82,10 +84,9 @@ class Event(CalendarRelated):
         Recurrence
     )
 
-    def serialize(self, uuid, cal):
+    def serialize(self, cal):
         event = cal.add('vevent')
-        event.add('uid')
-        event.uid.value = '%s@iphone-%s' % (self.id, uuid)
+        event.add('uid').value = self.uuid
 
         if hasattr(self, 'all_day'):
             event.add('dtstart').value = self.start_date.date()
@@ -126,24 +127,29 @@ class Calendar(Base):
         return 'Calendar: %s' % self.title
     __repr__ = __str__
 
-    def serialize(self, uuid):
+    def __ical__(self):
         cal = vobject.iCalendar()
         title = cal.add('X-WR-CALNAME')
         title.value = self.title
 
         for id, event in self.events.items():
-            event.serialize(uuid, cal)
+            event.serialize(cal)
+        return cal
 
-        return cal.serialize()
+    def serialize(self):
+        return self.__ical__().serialize()
 
 class Calendars(BaseList):
     parent_schema_name = "com.apple.Calendars"
     parent_schema_class = Calendar
 
-    state = state.calendars
+    config = config.add('calendars', {})
+    state = state.add('calendars', {
+        'last_sync_time': None
+    })
 
-    def __init__(self, mobile_sync):
-        super(Calendars, self).__init__(mobile_sync)
+    def __init__(self, uuid, mobile_sync):
+        super(Calendars, self).__init__(uuid, mobile_sync)
 
         self._event_records = {}
         self.__event_class_map = {}
@@ -154,7 +160,7 @@ class Calendars(BaseList):
         super(Calendars, self)._process_record(entity_name, id, record)
         if entity_name in self.__event_class_map:
             cls = self.__event_class_map[entity_name]
-            obj = cls(id, record)
+            obj = cls(self._uuid, id, record)
 
             self._process_related_record(obj)
 
@@ -167,3 +173,5 @@ class Calendars(BaseList):
         else:
             parent_objs = getattr(self._event_records[related_record.parent_id], related_record.parent_prop)
             parent_objs[related_record.id] = related_record
+
+parser.add_option('--calendars', action='append_const', dest='sync_type', const=Calendars)

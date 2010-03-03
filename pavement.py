@@ -13,14 +13,14 @@ setup(
     author_email='bryan@reigndropsfall.net',
     url='',
     install_requires=['vobject'],
-    packages=[],
+    packages=['imobilesync', 'imobilesync.data'],
     package_data=find_package_data('imobilesync', package='imobilesync', only_in_packages=False),
-    zip_safe=False,
+    zip_safe=True,
     #test_suite='nose.collector',
     #setup_requires=['nose>=0.11'],
     entry_points="""
         [console_scripts]
-        imobilesync = imobilesync:main
+        imobilesync = imobilesync.commands:main
     """
 )
 options(
@@ -28,6 +28,7 @@ options(
         extra_files=['virtual']
     ),
     virtualenv=Bunch(
+        packages_to_install=["ipython"],
         paver_command_line='develop',
         unzip_setuptools=True
     )
@@ -43,7 +44,7 @@ def sdist():
 def clean():
     """Cleans up the virtualenv"""
     for p in ('bin', 'build', 'dist', 'docs', 'include', 'lib', 'man',
-            'share', 'imobilesync.egg-info', 'paver-minilib.zip', 'setup.py'):
+            'share', 'imobilesync.egg-info'):
         pth = path(p)
         if pth.isdir():
             pth.rmtree()

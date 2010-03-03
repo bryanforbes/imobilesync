@@ -1,6 +1,8 @@
 from imobilesync.data.base import BaseList, Base, RelatedBase
-from imobilesync.config import state
-import vobject, time, base64
+from imobilesync.config import state, config
+from imobilesync.options import parser
+
+import vobject, time, base64, pdb
 
 __all__ = ['Contact', 'Contacts']
 
@@ -40,7 +42,7 @@ class EmailAddress(ContactRelated):
 
     def serialize(self, card):
         email = card.add('email')
-        email.params['TYPE'] = [self.get_type_or_label().upper()]
+        email.type_param = self.get_type_or_label().upper()
         email.value = self.value
 
 class Group(ContactRelated):
@@ -58,7 +60,7 @@ class IM(ContactRelated):
     def serialize(self, card):
         im = card.add('x-%s' % self.service)
         im.value = self.user
-        im.params['TYPE'] = [self.get_type_or_label().upper()]
+        im.type_param = self.get_type_or_label().upper()
 
 class PhoneNumber(ContactRelated):
     entity_name = 'com.apple.contacts.Phone Number'
@@ -71,7 +73,7 @@ class PhoneNumber(ContactRelated):
         if teltype == "MOBILE":
             teltype = "CELL"
         tel.value = self.value
-        tel.params['TYPE'] = [teltype]
+        tel.type_param = teltype
 
 class RelatedName(ContactRelated):
     entity_name = 'com.apple.contacts.Related Name'
@@ -89,10 +91,13 @@ class StreetAddress(ContactRelated):
             address['street'] = get_value('street')
         if self.record_dict.has_key('street'):
             address['city'] = get_value('city')
-        if self.record_dict.has_key('country code'):
-            address['region'] = get_value('country code')
+        if self.record_dict.has_key('state'):
+            address['region'] = get_value('state')
         if self.record_dict.has_key('postal code'):
             address['code'] = get_value('postal code')
+        if self.record_dict.has_key('country code') and \
+            not self.record_dict.has_key('country'):
+            address['country'] = get_value('country code').upper()
         if self.record_dict.has_key('country'):
             address['country'] = get_value('country')
 
@@ -102,7 +107,7 @@ class StreetAddress(ContactRelated):
     def serialize(self, card):
         adr = card.add('adr')
         adr.value = vobject.vcard.Address(**self.address_dict)
-        adr.params['TYPE'] = [self.get_type_or_label().upper()]
+        adr.type_param = self.get_type_or_label().upper()
 
 class URL(ContactRelated):
     entity_name = 'com.apple.contacts.URL'
@@ -111,7 +116,7 @@ class URL(ContactRelated):
     def serialize(self, card):
         url = card.add('url')
         url.value = self.value
-        url.params['TYPE'] = [self.get_type_or_label().upper()]
+        url.type_param = self.get_type_or_label().upper().replace(' ', '')
 
 class Contact(Base):
     entity_name = 'com.apple.contacts.Contact'
@@ -156,10 +161,9 @@ class Contact(Base):
 
     __repr__ = __str__
 
-    def serialize(self, uuid):
+    def __vcard__(self):
         card = vobject.vCard()
-        card.add('uid')
-        card.uid.value = '%s@iphone-%s' % (self.id, uuid)
+        card.add('uid').value = self.uuid
 
         #for id, group in self.groups.items():
             #card.add('categories')
@@ -211,22 +215,28 @@ class Contact(Base):
             card.bday.value = self.birthday.strftime("%Y-%m-%d")
 
         if hasattr(self, 'image'):
-            card.add('photo')
-            card.photo.value = base64.b64encode(self.image)
-            card.photo.params['ENCODING'] = ['BASE64']
-            card.photo.params['TYPE'] = ['JPEG']
+            photo = card.add('photo')
+            photo.encoding_param = 'B'
+            photo.type_param = 'JPEG'
+            photo.value = self.image
 
         if hasattr(self, "notes"):
             card.add('note')
             card.note.value = self.notes
 
-        return card.serialize()
+        return card
+
+    def serialize(self):
+        return self.__vcard__().serialize()
 
 class Contacts(BaseList):
     parent_schema_name = "com.apple.Contacts"
     parent_schema_class = Contact
 
-    state = state.contacts
+    config = config.add('contacts', {})
+    state = state.add('contacts', {
+        'last_sync_time': None
+    })
 
     def __process_related_record(self, related_record):
         if isinstance(related_record, Group):
@@ -234,3 +244,5 @@ class Contacts(BaseList):
                 self._parent_records[id].groups[related_record.id] = related_record
         else:
             super(Contacts, self).__process_related_record(related_record)
+
+parser.add_option('--contacts', action='append_const', dest='sync_type', const=Contacts)

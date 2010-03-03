@@ -13,7 +13,9 @@ class SyncError(Exception):
         pass
 
     def __str__(self):
-        return repr(self.value)
+        return self.value
+
+    __repr__ = __str__
 
 class SyncErrorCancel(SyncError):
     def __init__(self, schema_type, reason):
@@ -47,7 +49,7 @@ class Sync(object):
         device = self.__device = idevice()
 
         if uuid is not None:
-            if not device.init_device_by_uuid(uuid):
+            if not device.init_device_by_uuid(str(uuid)):
                 raise SyncError('No iDevice with uuid %s.' % uuid)
         else:
             if not device.init_device():
@@ -72,13 +74,21 @@ class Sync(object):
         obj = self.__get_records(cls)
         return obj.changes()
 
+    def get_all_records_hashed(self, cls):
+        objs = self.get_all_records(cls)
+        return dict((record.uuid, record) for record in objs)
+
+    def get_changed_records_hashed(self, cls):
+        objs = self.get_changed_records(cls)
+        return dict((record.uuid, record) for record in objs)
+
     def serialize_all(self, cls):
         objs = self.get_all_records(cls)
-        return cls.serialize(self.uuid, objs)
+        return cls.serialize(objs)
 
     def serialize_changed(self, cls):
         objs = self.get_changed_records(cls)
-        return cls.serialize(self.uuid, objs)
+        return cls.serialize(objs)
 
     def ping(self):
         msg = create_array(
@@ -120,4 +130,14 @@ class Sync(object):
         )
         ret = self.__mobile_sync.receive()
 
-        return cls(self.__mobile_sync)
+        return cls(self.uuid, self.__mobile_sync)
+
+class SyncFactory(object):
+    __sync = None
+
+    @classmethod
+    def get(cls, uuid=None):
+        if cls.__sync is None:
+            cls.__sync = Sync(uuid)
+            cls.__sync.connect()
+        return cls.__sync
