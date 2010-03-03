@@ -10,9 +10,20 @@ conduit (optional)
 
 Installation
 ============
-
-The easy way:
+Normal:
 sudo python setup.py install
 
 For developers (virtualenv):
 python bootstrap.py
+
+Using the Conduit Module
+========================
+From a normal installation:
+% mkdir -p $XDG_CONFIG_HOME/conduit/modules
+% ln -s conduit $XDG_CONFIG_HOME/conduit/modules/iDeviceModule
+% /usr/bin/conduit
+
+From the development virtualenv:
+% mkdir -p $XDG_CONFIG_HOME/conduit/modules
+% ln -s conduit $XDG_CONFIG_HOME/conduit/modules/iDeviceModule
+% bin/python /usr/bin/conduit
